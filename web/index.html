@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Unipus 复制内容解密</title>
+<style>
+  :root{
+    --bg:#f5f7fa; --card:#ffffff; --text:#1f2937; --muted:#6b7280;
+    --line:#e5e7eb; --accent:#2563eb; --accent-hover:#1d4ed8;
+    --ok:#059669; --err:#dc2626;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:linear-gradient(180deg,#eef2f7,#f8fafc 40%);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:var(--text);padding:32px 16px}
+  .wrap{max-width:880px;margin:0 auto}
+  h1{font-size:24px;margin:0 0 8px}
+  .sub{color:var(--muted);font-size:14px;line-height:1.75;margin:0 0 20px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:0 8px 30px rgba(15,23,42,.06)}
+  label{display:block;font-size:13px;font-weight:600;margin:0 0 8px}
+  textarea{width:100%;min-height:130px;resize:vertical;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:14px;line-height:1.65;font-family:ui-monospace,SFMono-Regular,Consolas,"Microsoft YaHei",monospace;background:#fbfcfe;color:var(--text);outline:none;transition:.15s}
+  textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;align-items:center}
+  button{border:1px solid transparent;border-radius:10px;padding:10px 18px;font-size:14px;font-weight:600;cursor:pointer;transition:.15s}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .primary{background:var(--accent);color:#fff}
+  .primary:hover:not(:disabled){background:var(--accent-hover)}
+  .ghost{background:#fff;border-color:var(--line);color:var(--text)}
+  .ghost:hover:not(:disabled){background:#f8fafc}
+  .status{margin-left:auto;font-size:13px;color:var(--muted)}
+  .status.ok{color:var(--ok)}
+  .status.err{color:var(--err)}
+  .out-wrap{margin-top:18px}
+  #output{min-height:190px;background:#f8fafc}
+  .notes{margin-top:18px;padding:16px 18px;border-radius:12px;background:#f8fafc;border:1px dashed var(--line);font-size:13px;line-height:1.8;color:#374151}
+  .notes b{color:var(--text)}
+  code{background:#eef2f7;border-radius:4px;padding:1px 5px;font-family:ui-monospace,Consolas,monospace;font-size:12px}
+  .tip{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.7}
+  @media (max-height: 640px) {
+    body{padding:12px}
+    h1{font-size:19px;margin-bottom:8px}
+    .sub{display:none}
+    .card{padding:12px}
+    textarea{min-height:76px}
+    #output{min-height:90px}
+    .row{margin-top:8px}
+    .out-wrap{margin-top:12px}
+    .notes,.tip{display:none}
+  }
+</style>
+<script src="crypto-js.min.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <h1>Unipus 复制内容解密</h1>
+  <p class="sub">Unipus 网页在复制时会把选中的文字加密成 <code>unipus-content:...</code>。把那一整串粘贴到下面，就能还原成正常文字。</p>
+
+  <div class="card">
+    <label for="input">粘贴复制到的内容</label>
+    <textarea id="input" placeholder="unipus-content:U2FsdGVkX1+...（可一次粘贴多段，每段都要完整，含结尾的 ==）" spellcheck="false"></textarea>
+
+    <div class="row">
+      <button class="primary" id="btnDecrypt">解密</button>
+      <button class="ghost" id="btnDemo">示例</button>
+      <button class="ghost" id="btnClear">清空</button>
+      <span class="status" id="status">正在加载解密组件…</span>
+    </div>
+
+    <div class="out-wrap">
+      <label for="output">解密结果</label>
+      <textarea id="output" readonly placeholder="解密后的文字会显示在这里"></textarea>
+      <div class="row">
+        <button class="ghost" id="btnCopy">复制明文</button>
+        <span class="status" id="copyStatus"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <b>说明：</b>这不是破解密码。网页本身就是用 AES 加密剪贴板内容，密钥固定写在网页脚本里（<code>unipus</code>），这里只是按同样的规则还原。<br>
+    <b>支持多段：</b>一次粘贴多段 <code>unipus-content:...</code> 也可以，会按顺序逐段解密。<br>
+    <b>更快的办法：</b>在 Unipus 页面里点进任意一个输入框，直接 <code>Ctrl+V</code> 粘贴那串 <code>unipus-content:...</code>，页面的粘贴处理会自动把它变成明文（注意别粘到会提交答案的答题框里）。<br>
+    <b>完全离线运行：</b>解密库已打包进程序，内容不会上传到任何服务器，断网也能用。
+  </div>
+  <p class="tip">若状态一直停在“正在加载”，请关闭程序重新打开；仍不行可改用上面的“页面内粘贴”方法。</p>
+</div>
+
+<script>
+(function () {
+  var CDNS = [
+    'https://cdn.bootcdn.net/ajax/libs/crypto-js/4.2.0/crypto-js.min.js',
+    'https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js',
+    'https://unpkg.com/crypto-js@4.2.0/crypto-js.min.js'
+  ];
+
+  var input = document.getElementById('input');
+  var output = document.getElementById('output');
+  var statusEl = document.getElementById('status');
+  var copyStatus = document.getElementById('copyStatus');
+  var btnDecrypt = document.getElementById('btnDecrypt');
+  var btnDemo = document.getElementById('btnDemo');
+  var btnClear = document.getElementById('btnClear');
+  var btnCopy = document.getElementById('btnCopy');
+  var ready = false;
+  var timer = null;
+
+  function setStatus(msg, cls) {
+    statusEl.textContent = msg;
+    statusEl.className = 'status' + (cls ? ' ' + cls : '');
+  }
+
+  function loadLib(i) {
+    if (window.CryptoJS) {
+      ready = true;
+      btnDecrypt.disabled = false;
+      setStatus('解密组件已就绪', 'ok');
+      return;
+    }
+    if (i >= CDNS.length) {
+      setStatus('解密组件加载失败，请改用“页面内粘贴”方法', 'err');
+      return;
+    }
+    var s = document.createElement('script');
+    s.src = CDNS[i];
+    s.onload = function () {
+      if (window.CryptoJS) {
+        ready = true;
+        btnDecrypt.disabled = false;
+        setStatus('解密组件已就绪', 'ok');
+      } else {
+        loadLib(i + 1);
+      }
+    };
+    s.onerror = function () { loadLib(i + 1); };
+    document.head.appendChild(s);
+  }
+
+  function decryptOne(cipher) {
+    return CryptoJS.AES.decrypt(cipher, 'unipus').toString(CryptoJS.enc.Utf8);
+  }
+
+  function doDecrypt() {
+    var raw = input.value.trim();
+    if (!raw) {
+      setStatus('请先粘贴内容', 'err');
+      output.value = '';
+      return;
+    }
+    if (raw.indexOf('unipus-content:') < 0) {
+      output.value = raw;
+      setStatus('输入的不是加密串，已原样显示', '');
+      return;
+    }
+    if (!ready) {
+      setStatus('解密组件还没加载好，请稍等', 'err');
+      return;
+    }
+    var parts = raw.split('unipus-content:').filter(function (p) { return p.trim(); });
+    var results = [];
+    for (var i = 0; i < parts.length; i++) {
+      var cipher = parts[i].replace(/\s+/g, '');
+      if (!/^[A-Za-z0-9+/]+={0,2}$/.test(cipher) || cipher.length % 4 !== 0) {
+        output.value = '';
+        setStatus('第 ' + (i + 1) + ' 段不完整：请整段复制（含结尾的 ==）', 'err');
+        return;
+      }
+      var plain = '';
+      try { plain = decryptOne(cipher); } catch (e) { plain = ''; }
+      if (!plain) {
+        output.value = '';
+        setStatus('第 ' + (i + 1) + ' 段解密失败：内容可能被截断', 'err');
+        return;
+      }
+      results.push(plain);
+    }
+    output.value = results.join('\n\n');
+    setStatus('解密成功 · ' + results.length + ' 段 · ' + output.value.length + ' 个字符', 'ok');
+  }
+
+  function fallbackCopy() {
+    output.focus();
+    output.select();
+    output.setSelectionRange(0, output.value.length);
+    try {
+      document.execCommand('copy');
+      copyStatus.textContent = '已复制';
+    } catch (e) {
+      copyStatus.textContent = '复制失败，请手动选择';
+    }
+    setTimeout(function () { copyStatus.textContent = ''; }, 1600);
+  }
+
+  function copyOut() {
+    if (!output.value) {
+      copyStatus.textContent = '没有可复制的内容';
+      setTimeout(function () { copyStatus.textContent = ''; }, 1600);
+      return;
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(output.value).then(function () {
+        copyStatus.textContent = '已复制';
+        setTimeout(function () { copyStatus.textContent = ''; }, 1600);
+      }).catch(fallbackCopy);
+    } else {
+      fallbackCopy();
+    }
+  }
+
+  btnDecrypt.addEventListener('click', doDecrypt);
+  btnCopy.addEventListener('click', copyOut);
+  btnClear.addEventListener('click', function () {
+    input.value = '';
+    output.value = '';
+    copyStatus.textContent = '';
+    setStatus(ready ? '解密组件已就绪' : '正在加载解密组件…', ready ? 'ok' : '');
+    input.focus();
+  });
+  btnDemo.addEventListener('click', function () {
+    if (!ready) {
+      setStatus('解密组件还没加载好，请稍等', 'err');
+      return;
+    }
+    var demo = '示例：identity is more complex than that.';
+    input.value = 'unipus-content:' + CryptoJS.AES.encrypt(demo, 'unipus').toString();
+    doDecrypt();
+  });
+
+  input.addEventListener('input', function () {
+    clearTimeout(timer);
+    var v = input.value.trim();
+    if (v.indexOf('unipus-content:') === 0 && v.length > 120) {
+      timer = setTimeout(doDecrypt, 350);
+    }
+  });
+  input.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      doDecrypt();
+    }
+  });
+
+  btnDecrypt.disabled = true;
+  loadLib(0);
+
+  if (location.hash === '#demo') {
+    var t = setInterval(function () {
+      if (ready) {
+        clearInterval(t);
+        var demo = '示例：identity is more complex than that.';
+        input.value = 'unipus-content:' + CryptoJS.AES.encrypt(demo, 'unipus').toString();
+        doDecrypt();
+      }
+    }, 200);
+  }
+})();
+</script>
+</body>
+</html>
