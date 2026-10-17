@@ -15,11 +15,11 @@
         '080404B0',
         [
           StringStruct('CompanyName', ''),
-          StringStruct('FileDescription', 'Unipus 复制内容解密'),
+          StringStruct('FileDescription', 'UnipusToNaked - Unipus 复制内容解密'),
           StringStruct('FileVersion', '1.0.0.0'),
-          StringStruct('InternalName', 'U_to_N'),
-          StringStruct('OriginalFilename', 'Unipus解密工具.exe'),
-          StringStruct('ProductName', 'Unipus 复制内容解密'),
+          StringStruct('InternalName', 'UnipusToNaked'),
+          StringStruct('OriginalFilename', 'UnipusToNaked.exe'),
+          StringStruct('ProductName', 'UnipusToNaked'),
           StringStruct('ProductVersion', '1.0.0.0')
         ]
       )

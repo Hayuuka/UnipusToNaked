@@ -40,7 +40,7 @@ if (-not (Test-Path -LiteralPath $built)) {
     throw "构建失败：找不到 $built"
 }
 
-$release = Join-Path $root "dist\Unipus解密工具.exe"
+$release = Join-Path $root "dist\UnipusToNaked.exe"
 Move-Item -LiteralPath $built -Destination $release -Force
 
 Write-Host ""

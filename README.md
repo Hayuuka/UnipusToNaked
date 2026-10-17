@@ -1,5 +1,11 @@
 ﻿# Unipus 复制内容解密（桌面版）
 
+GitHub: https://github.com/Hayuuka/UnipusToNaked
+
+## 下载
+
+编译好的单文件 exe 见 [Releases](https://github.com/Hayuuka/UnipusToNaked/releases)。
+
 把 Unipus 网页复制出来的 `unipus-content:...` 还原成正常文字的小工具。
 网页本身用 AES 加密剪贴板内容，密钥固定写在它的前端脚本里（`unipus`），
 本工具只是按同样的规则在本地解密，不上传任何内容。
@@ -24,7 +30,7 @@ U_to_N/
 ├─ requirements.txt
 ├─ build.ps1            # 一键打包
 └─ dist/                # 打包输出
-   └─ Unipus解密工具.exe
+   └─ UnipusToNaked.exe
 ```
 
 ## 开发运行
@@ -40,7 +46,7 @@ python app.py
 powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
-输出：`dist\Unipus解密工具.exe`
+输出：`dist\UnipusToNaked.exe`
 
 ## 说明
 
